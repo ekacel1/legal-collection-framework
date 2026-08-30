@@ -1,0 +1,28 @@
+# Runtime local — jamais versionne (Vol. IV, ch. 4)
+/data/
+!/data/.gitkeep
+
+# Artefacts derives — toujours reconstructibles (Vol. V, R-2)
+**/derived/
+
+# Dependances et build
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Environnement et secrets — Vol. VI, ch. 4
+.env
+.env.*
+tokens.json
+*.pem
+*.key
+
+# Sauvegardes
+/backup/
+
+# Divers
+.DS_Store
+Thumbs.db
+*.log
+__pycache__/
