@@ -1,0 +1,16 @@
+{
+  "name": "@lcf/kernel",
+  "version": "0.1.0",
+  "description": "Noyau LCF : domaine, magasin de contenu, event bus, scheduler, integrite",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=22.5.0" },
+  "dependencies": {}
+}

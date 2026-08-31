@@ -1,0 +1,67 @@
+{
+  "dataDir": "./data",
+  "pluginPaths": [
+    "./plugins"
+  ],
+  "contact": "A-REMPLACER@exemple.org",
+  "sources": [
+    {
+      "sourceId": "bj.sgg.lois",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "lois"
+      },
+      "enabled": true
+    },
+    {
+      "sourceId": "bj.sgg.decrets",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "decrets"
+      },
+      "enabled": true
+    },
+    {
+      "sourceId": "bj.sgg.ordonnances",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "ordonnances"
+      },
+      "enabled": true
+    },
+    {
+      "sourceId": "bj.sgg.arretes",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "arretes"
+      },
+      "enabled": true
+    },
+    {
+      "sourceId": "bj.sgg.accords",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "accords"
+      },
+      "enabled": true
+    },
+    {
+      "sourceId": "bj.sgg.decisions",
+      "pluginId": "bj.sgg",
+      "config": {
+        "category": "decisions"
+      },
+      "enabled": true
+    }
+  ],
+  "blackoutWindows": [
+    {
+      "days": "mon-fri",
+      "from": "07:00",
+      "to": "19:00",
+      "tz": "utc"
+    }
+  ],
+  "defaultCron": "0 2 * * *",
+  "silentAfterHours": 72
+}

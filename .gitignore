@@ -26,3 +26,6 @@ tokens.json
 Thumbs.db
 *.log
 __pycache__/
+
+# Configuration locale de deploiement (contact reel, chemins de la machine)
+/lcf.config.json

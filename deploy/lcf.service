@@ -1,0 +1,45 @@
+[Unit]
+Description=Legal Collection Framework — collecteur documentaire
+Documentation=https://github.com/lcf
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lcf
+Group=lcf
+WorkingDirectory=/opt/lcf
+
+# Node 24 rend `node:sqlite` stable : le drapeau devient inutile et sans effet.
+# Le lanceur le rajoute de lui-meme si la version de Node l'exige.
+ExecStart=/usr/bin/node /opt/lcf/packages/cli/dist/src/bin.js daemon
+
+# Arret propre : le demon termine le document en cours puis sort. Un delai
+# genereux evite de tuer un transfert de 37 Mo a deux secondes de la fin.
+KillSignal=SIGTERM
+TimeoutStopSec=300
+
+Restart=on-failure
+RestartSec=30
+
+# Le corpus est un actif : on protege le reste du systeme de fichiers.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/lcf /var/backups/lcf
+
+# Bornes de ressources. Le magasin streame : la memoire ne depend pas de la
+# taille des documents, seulement du nombre de tampons en vol.
+MemoryMax=1G
+TasksMax=64
+
+# Secrets eventuels d'un futur plugin (le SGG n'en demande aucun).
+# EnvironmentFile=-/etc/lcf/secrets.env
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lcf
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+{
+  "name": "@lcf/conformance",
+  "version": "0.1.0",
+  "description": "Plugin Conformance Kit : huit familles de tests",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=22.5.0" },
+  "dependencies": { "@lcf/kernel": "0.1.0", "@lcf/plugin-testkit": "0.1.0" }
+}

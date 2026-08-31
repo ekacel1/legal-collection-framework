@@ -1,0 +1,17 @@
+{
+  "name": "@lcf/cli",
+  "version": "0.1.0",
+  "description": "Commande lcf",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=22.5.0" },
+  "bin": { "lcf": "./dist/src/bin.js" },
+  "dependencies": { "@lcf/kernel": "0.1.0" }
+}

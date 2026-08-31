@@ -1,0 +1,58 @@
+{
+  "manifestVersion": 1,
+  "id": "example.paginated.portal",
+  "name": "Example Paginated Portal Collector",
+  "version": "0.1.0",
+  "apiVersion": "^1.0",
+  "entry": "./dist/src/index.js",
+  "license": "Apache-2.0",
+  "maintainers": ["ops@example.org"],
+
+  "source": {
+    "displayName": "Example Paginated Portal",
+    "homepage": "https://portal.example",
+    "jurisdictionHint": "opaque-to-kernel",
+    "languages": ["fr"]
+  },
+
+  "capabilities": {
+    "network": {
+      "allowedHosts": ["portal.example"],
+      "maxRequestsPerMinute": 30,
+      "politenessDelayMs": 1200,
+      "respectRobotsTxt": true
+    },
+    "browser": false,
+    "inlineContent": false
+  },
+
+  "schedule": {
+    "defaultCron": "0 3 * * *",
+    "timezone": "UTC",
+    "maxConcurrentDownloads": 2
+  },
+
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": { "type": "string", "pattern": "^https?://" },
+      "startYear": { "type": "integer", "minimum": 1900 },
+      "categories": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": ["baseUrl"],
+    "additionalProperties": false
+  },
+
+  "secrets": [],
+
+  "integrity": {
+    "expectedMimeTypes": ["application/pdf"],
+    "minDocumentBytes": 8,
+    "maxDocumentBytes": 209715200
+  },
+
+  "conformance": {
+    "kitVersion": "1.0",
+    "fixturesPath": "./test/fixtures"
+  }
+}

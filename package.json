@@ -1,0 +1,33 @@
+{
+  "name": "lcf",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Legal Collection Framework - collecte documentaire extensible par plugins",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "workspaces": [
+    "packages/kernel",
+    "packages/plugin-toolkit",
+    "packages/plugin-testkit",
+    "packages/conformance",
+    "packages/cli",
+    "plugins/example-paginated-portal",
+    "plugins/sgg-benin"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "build:clean": "tsc --build --clean",
+    "typecheck": "tsc --build --dry",
+    "test": "npm run build && node --experimental-sqlite --test \"{packages,plugins}/*/dist/test/**/*.test.js\"",
+    "test:watch": "node --experimental-sqlite --test --watch \"{packages,plugins}/*/dist/test/**/*.test.js\"",
+    "coverage": "npm run build && node --experimental-sqlite --test --experimental-test-coverage \"{packages,plugins}/*/dist/test/**/*.test.js\"",
+    "lcf": "node --experimental-sqlite packages/cli/dist/src/bin.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.7.0"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "_lisez_moi": [
+    "Configuration de production pour un serveur Linux.",
+    "A copier vers /opt/lcf/lcf.config.json puis a ajuster : seuls 'contact',",
+    "'dataDir' et 'backupDir' demandent une decision de votre part.",
+    "Ce fichier ne contient AUCUN secret et peut etre versionne tel quel.",
+    "Les cles commencant par '_' sont ignorees par le Framework."
+  ],
+
+  "dataDir": "/var/lib/lcf/data",
+  "backupDir": "/var/backups/lcf",
+  "logDir": "/var/lib/lcf/data/logs",
+  "migrationsDir": "/opt/lcf/migrations",
+  "pluginPaths": ["/opt/lcf/plugins"],
+
+  "contact": "tikatokamoney@gmail.com",
+
+  "_contact": [
+    "Part dans le User-Agent de CHAQUE requete (Vol. VI, 7.2).",
+    "Doit rester une boite reellement relevee : c'est ce qui permet a",
+    "l'administrateur d'une source de vous ecrire plutot que de vous bloquer."
+  ],
+
+  "defaultCron": "0 2 * * *",
+  "silentAfterHours": 72,
+
+  "blackoutWindows": [{ "days": "mon-fri", "from": "07:00", "to": "19:00", "tz": "utc" }],
+
+  "_blackoutWindows": [
+    "Heures ouvrables au Benin (UTC+1) : 08h-20h locales.",
+    "Aucune requete n'est emise pendant ces creneaux, et une collecte en cours",
+    "s'arrete proprement si la fenetre s'ouvre. Elle reprendra ou elle en etait."
+  ],
+
+  "dashboard": { "host": "127.0.0.1", "port": 7331 },
+
+  "_dashboard": [
+    "Ecoute locale uniquement. Pour y acceder depuis votre poste :",
+    "  ssh -N -L 7331:127.0.0.1:7331 lcf@votre-serveur",
+    "puis ouvrir http://127.0.0.1:7331",
+    "Ne l'exposez jamais nu : il permet de declencher des collectes."
+  ],
+
+  "sources": [
+    {
+      "sourceId": "bj.sgg.lois",
+      "pluginId": "bj.sgg",
+      "config": { "category": "lois" },
+      "enabled": true,
+      "cron": "0 2 * * *"
+    },
+    {
+      "sourceId": "bj.sgg.decrets",
+      "pluginId": "bj.sgg",
+      "config": { "category": "decrets" },
+      "enabled": true,
+      "cron": "30 2 * * *"
+    },
+    {
+      "sourceId": "bj.sgg.ordonnances",
+      "pluginId": "bj.sgg",
+      "config": { "category": "ordonnances" },
+      "enabled": true,
+      "cron": "0 3 * * *"
+    },
+    {
+      "sourceId": "bj.sgg.arretes",
+      "pluginId": "bj.sgg",
+      "config": { "category": "arretes" },
+      "enabled": true,
+      "cron": "30 3 * * *"
+    },
+    {
+      "sourceId": "bj.sgg.accords",
+      "pluginId": "bj.sgg",
+      "config": { "category": "accords" },
+      "enabled": true,
+      "cron": "40 3 * * *"
+    },
+    {
+      "sourceId": "bj.sgg.decisions",
+      "pluginId": "bj.sgg",
+      "config": { "category": "decisions" },
+      "enabled": true,
+      "cron": "50 3 * * *"
+    }
+  ],
+
+  "_sources": [
+    "Les six categories de la documentheque du SGG, echelonnees dans la nuit.",
+    "Elles visent le meme hote : le limiteur de debit est partage, donc les",
+    "echelonner ne multiplie pas la charge, cela evite seulement de mettre",
+    "toute la nuit sur une seule categorie.",
+    "Volume estime : ~35 000 documents, 25 a 33 Go, environ 60 h pour la",
+    "premiere collecte complete, etalee sur plusieurs nuits."
+  ]
+}
