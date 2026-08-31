@@ -348,6 +348,53 @@ describe("reprise incrementale (Vol. III, 7.3)", () => {
   });
 });
 
+describe("un balayage tronque n'est pas un balayage complet", () => {
+  test("une collecte plafonnee ne fait pas croire la source entierement revue", async () => {
+    harness.plugin.documents = ["a", "b", "c"];
+    const summary = await harness.runner.run(harness.loaded, { mode: "full", maxDocuments: 1 });
+
+    const run = await harness.repository.getRun(summary.runId);
+    assert.equal(run?.status, "completed");
+    // Elle s'est bien terminee, mais elle n'a pas parcouru la source.
+    assert.match(String(run?.errorSummary), /tronquee/);
+    assert.equal(await harness.repository.lastFullSweepAt(SOURCE), null);
+  });
+
+  test("apres un balayage tronque, l'incremental reste promu en complet", async () => {
+    harness.plugin.documents = ["a", "b", "c"];
+    await harness.runner.run(harness.loaded, { mode: "full", maxDocuments: 1 });
+
+    // Le defaut corrige : la nuit suivante se croyait a jour et ne reprenait
+    // jamais les 30 000 documents restants.
+    const second = await harness.runner.run(harness.loaded, { mode: "incremental" });
+    assert.equal((await harness.repository.getRun(second.runId))?.mode, "full");
+  });
+
+  test("un balayage tronque ne peut pas declarer un document retire", async () => {
+    harness.plugin.documents = ["a", "b"];
+    await harness.runner.run(harness.loaded, { mode: "full" });
+
+    // Trois balayages qui ne voient jamais « b » — mais tous tronques.
+    harness.plugin.documents = ["a"];
+    for (let index = 0; index < 3; index++) {
+      await harness.runner.run(harness.loaded, { mode: "full", maxDocuments: 1 });
+    }
+
+    // Un balayage qui n'a pas vu le document ne peut pas temoigner de sa
+    // disparition : le declarer retire serait un faux fait juridique.
+    const documentId = computeDocumentId(SOURCE, "b");
+    assert.equal((await harness.repository.getDocument(documentId))?.status, "stored");
+  });
+
+  test("un balayage mene a son terme compte, lui", async () => {
+    await harness.runner.run(harness.loaded, { mode: "full" });
+    assert.notEqual(await harness.repository.lastFullSweepAt(SOURCE), null);
+
+    const second = await harness.runner.run(harness.loaded, { mode: "incremental" });
+    assert.equal((await harness.repository.getRun(second.runId))?.mode, "incremental");
+  });
+});
+
 describe("balayage complet impose (Vol. III, 7.3)", () => {
   test("une source jamais parcourue entierement ignore le mode incremental", async () => {
     const summary = await harness.runner.run(harness.loaded, { mode: "incremental" });

@@ -8,6 +8,22 @@ pour la sauvegarde, et une marge.
 
 ---
 
+## 0. Régler le serveur en UTC — à ne pas sauter
+
+Les expressions cron sont évaluées dans le **fuseau local du serveur**, tandis
+que les fenêtres d'exclusion portent le leur (`"tz": "utc"`). Si les deux ne
+s'accordent pas, le démon peut se déclencher en pleine journée ouvrable — ou
+ne jamais se déclencher du tout.
+
+```bash
+sudo timedatectl set-timezone UTC
+timedatectl        # doit afficher UTC
+```
+
+Le démon vérifie cette cohérence au démarrage : si les échéances d'une source
+tombent toutes dans une fenêtre d'exclusion, **il refuse de démarrer** et vous
+dit quelle heure locale il voit.
+
 ## 1. Utilisateur et répertoires
 
 ```bash
@@ -108,8 +124,13 @@ sudo -u lcf node /opt/lcf/packages/cli/dist/src/bin.js serve
 
 Le démon collecte chaque nuit à partir de 2 h et s'arrête de lui-même à 7 h UTC
 (8 h au Bénin). Les 35 000 documents demandent **environ 60 heures**, donc
-plusieurs nuits. Rien à faire : chaque nuit reprend là où la précédente s'est
-arrêtée.
+plusieurs nuits.
+
+Rien à faire : chaque nuit **reprend à la page où la précédente s'est arrêtée**,
+grâce au curseur de pagination conservé dans le point de reprise. Une collecte
+tronquée par le budget ou par l'ouverture d'une fenêtre d'exclusion n'est jamais
+comptée comme un balayage complet — c'est ce qui garantit que la progression
+continue nuit après nuit au lieu de se croire terminée.
 
 Pour amorcer plus vite, hors heures ouvrables :
 

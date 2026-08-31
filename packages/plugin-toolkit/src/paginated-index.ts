@@ -30,6 +30,22 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
   protected ctx!: PluginContext;
   readonly #maxPages: number;
   readonly #emptyStreakLimit: number;
+  /**
+   * Page a laquelle reprendre, quand le balayage precedent a ete tronque.
+   *
+   * Sans cette reprise, un balayage interrompu par le budget repartirait de la
+   * premiere page a chaque execution : sur une source de trente mille
+   * documents, la collecte ne depasserait jamais ce qu'une seule nuit permet.
+   */
+  #resumeFromPage = 0;
+  /**
+   * Un parcours est-il en cours, sans etre alle a son terme ?
+   *
+   * Distinct du numero de page : une interruption sur la page 0 doit se dire,
+   * sinon « interrompu tout de suite » et « acheve » se ressemblent, et le
+   * checkpoint ment sur ce qui s'est passe.
+   */
+  #sweepInProgress = false;
 
   constructor(options: PaginatedIndexOptions = {}) {
     this.#maxPages = options.maxPages ?? 1000;
@@ -71,9 +87,25 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
     this.ctx = ctx;
   }
 
+  /**
+   * Curseur de pagination a conserver dans le checkpoint.
+   * `undefined` quand le dernier balayage est alle a son terme : il n'y a alors
+   * rien a reprendre, et repartir du debut est le comportement voulu.
+   */
+  protected get paginationCursor(): string | undefined {
+    return this.#sweepInProgress ? `page:${this.#resumeFromPage}` : undefined;
+  }
+
+  /** Restitue un curseur rendu par `paginationCursor`. */
+  protected restorePagination(cursor: string | undefined): void {
+    const match = /^page:(\d+)$/.exec(cursor ?? "");
+    this.#resumeFromPage = match === null ? 0 : Number(match[1]);
+    this.#sweepInProgress = match !== null;
+  }
+
   async *discover(scope: DiscoveryScope): AsyncIterable<DocumentRef> {
     const seen = new Set<string>();
-    let page = 0;
+    let page = this.#resumeFromPage;
     let emptyStreak = 0;
     let previousSignature = "";
     let emitted = 0;
@@ -81,13 +113,19 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
     while (page < this.#maxPages) {
       if (this.ctx.signal.aborted) return;
 
+      // La page en cours est memorisee AVANT d'etre traitee : si l'execution
+      // est interrompue en plein milieu, la reprise la refera entierement
+      // plutot que de risquer d'en sauter la moitie.
+      this.#resumeFromPage = page;
+      this.#sweepInProgress = true;
+
       const url = this.buildPageUrl(page);
       const html = await this.ctx.http.getText(url);
       const refs = this.parsePage(html, url);
 
       if (refs.length === 0) {
         emptyStreak++;
-        if (emptyStreak >= this.#emptyStreakLimit) return;
+        if (emptyStreak >= this.#emptyStreakLimit) return this.#sweepCompleted();
       } else {
         emptyStreak = 0;
       }
@@ -98,7 +136,7 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
       if (refs.length > 0 && signature === previousSignature) return;
       previousSignature = signature;
 
-      if (this.shouldStopAtPage(refs, scope, page)) return;
+      if (this.shouldStopAtPage(refs, scope, page)) return this.#sweepCompleted();
 
       let novel = 0;
       for (const ref of refs) {
@@ -110,10 +148,21 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
         if (scope.maxDocuments !== undefined && emitted >= scope.maxDocuments) return;
       }
 
-      if (novel === 0 && refs.length > 0) return;
-      if (!this.hasNextPage(html, page)) return;
+      if (novel === 0 && refs.length > 0) return this.#sweepCompleted();
+      if (!this.hasNextPage(html, page)) return this.#sweepCompleted();
       page++;
     }
+    // Plafond de pages atteint : ce n'est pas un parcours acheve.
+  }
+
+  /**
+   * Le parcours est alle a son terme : plus rien a reprendre.
+   * Laisser le curseur en place ferait repartir la collecte suivante au milieu
+   * de l'index, et les nouveautes du debut ne seraient jamais revues.
+   */
+  #sweepCompleted(): void {
+    this.#resumeFromPage = 0;
+    this.#sweepInProgress = false;
   }
 
   abstract resolve(ref: DocumentRef): Promise<import("@lcf/kernel").FetchPlan>;

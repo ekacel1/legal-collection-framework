@@ -231,9 +231,12 @@ export class CollectionRunner {
     // trop ancien est promu en balayage complet.
     const mode = await this.#resolveMode(sourceId, options.mode ?? "full", logger);
 
-    // Restauration de l'etat de reprise AVANT toute decouverte : sans cela, le
-    // checkpoint enregistre a la fin de chaque collecte ne sert jamais a rien.
-    const restoredSince = mode === "incremental" ? await this.#restoreCheckpoint(loaded, logger) : undefined;
+    // Restauration de l'etat de reprise AVANT toute decouverte, QUEL QUE SOIT
+    // le mode : un balayage complet interrompu par le budget doit reprendre ou
+    // il s'est arrete, sinon il refait eternellement ses premieres pages. La
+    // borne temporelle, elle, ne sert qu'en incremental.
+    const restored = await this.#restoreCheckpoint(loaded, logger);
+    const restoredSince = mode === "incremental" ? restored : undefined;
 
     // Le budget est installe sur le client du plugin pour la duree de la
     // collecte : son epuisement interrompt l'enumeration la ou elle en est.
@@ -243,6 +246,7 @@ export class CollectionRunner {
     const counters = { ...ZERO_COUNTERS };
     const recentOutcomes: boolean[] = [];
     let blackoutStop: string | undefined;
+    let truncatedBy: string | undefined;
     let quarantined = false;
     let errorSummary: string | undefined;
     let status: RunSummary["status"] = "completed";
@@ -368,6 +372,9 @@ export class CollectionRunner {
         }
 
         if (options.maxDocuments !== undefined && counters.docsDiscovered >= options.maxDocuments) {
+          // Une collecte plafonnee a vu ce qu'on lui a demande de voir, pas la
+          // source : elle ne vaut pas balayage complet.
+          truncatedBy = `plafond de ${options.maxDocuments} documents`;
           break;
         }
       }
@@ -402,6 +409,12 @@ export class CollectionRunner {
       this.#plugins.markIdle(sourceId);
       this.#locks.release(sourceId);
     }
+
+    // Le motif d'interruption doit etre pose AVANT la cloture : c'est lui qui
+    // distingue, en base, un balayage mene a son terme d'un balayage tronque.
+    // Toute la logique de promotion et de retrait s'y adosse.
+    if (blackoutStop !== undefined) errorSummary = `interrompue : ${blackoutStop}`;
+    else if (truncatedBy !== undefined) errorSummary = `tronquee : ${truncatedBy}`;
 
     // Reprise ciblee : inutile apres un balayage complet, qui vient deja de
     // redecouvrir — et donc de retenter — tous les documents en echec. Inutile
@@ -458,8 +471,6 @@ export class CollectionRunner {
         { sourceId, runId, at: endedAtMs },
       ),
     );
-
-    if (blackoutStop !== undefined) errorSummary = `fenetre d'exclusion : ${blackoutStop}`;
 
     logger.info("collecte terminee", {
       status,

@@ -547,6 +547,10 @@ export class SqlDocumentRepository implements DocumentRepository {
                 WHERE r.source_id = d.source_id
                   AND r.mode = 'full'
                   AND r.status = 'completed'
+                  -- Seul un balayage MENE A SON TERME peut constater une
+                  -- absence. Un balayage tronque n'a pas vu le document : il
+                  -- ne peut pas temoigner de sa disparition.
+                  AND r.error_summary IS NULL
                   AND r.started_at > d.last_seen_at) >= ?`,
       [sourceId, missedSweeps],
     );
@@ -590,10 +594,20 @@ export class SqlDocumentRepository implements DocumentRepository {
     return row?.checkpoint_json ?? null;
   }
 
+  /**
+   * Dernier balayage complet mene JUSQU'AU BOUT.
+   *
+   * `error_summary IS NULL` n'est pas un detail : une execution arretee par le
+   * budget, par une fenetre d'exclusion ou par `--max` est enregistree
+   * `completed` — elle s'est bien terminee — mais elle n'a pas parcouru la
+   * source. La compter reviendrait a croire la source entierement revue apres
+   * en avoir vu le premier dixieme.
+   */
   async lastFullSweepAt(sourceId: SourceId): Promise<IsoTimestamp | null> {
     const row = await this.#exec.get<{ ended_at: string | null }>(
       `SELECT ended_at FROM runs
         WHERE source_id = ? AND mode = 'full' AND status = 'completed'
+          AND error_summary IS NULL
         ORDER BY started_at DESC LIMIT 1`,
       [sourceId],
     );

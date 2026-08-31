@@ -249,6 +249,89 @@ describe("collecte incrémentale (Vol. III, 7.3)", () => {
   });
 });
 
+describe("reprise d'un balayage tronque", () => {
+  test("le curseur de pagination survit a une interruption", async () => {
+    const { ctx } = createTestContext({
+      sourceId: "bj.sgg",
+      config: { category: "lois", baseUrl: BASE },
+      allowedHosts: ["sgg.gouv.bj"],
+      fixtures: {
+        [`${BASE}/documentheque/lois/`]: { body: page1 },
+        [`${BASE}/documentheque/lois/2/`]: { body: page2 },
+      },
+    });
+    const plugin = new SggBeninPlugin();
+    await plugin.init(ctx);
+
+    // On consomme une seule page puis on abandonne, comme le ferait un budget
+    // epuise au milieu d'un balayage de 82 pages.
+    const iterator = plugin
+      .discover({
+        mode: "full",
+        budget: { maxRequests: 100, maxBytes: 10_000_000, maxDurationMs: 60_000 },
+      })
+      [Symbol.asyncIterator]();
+    for (let index = 0; index < 20; index++) await iterator.next();
+    await iterator.return?.(undefined);
+
+    const state = await plugin.checkpoint();
+    assert.equal(state.cursor, "page:0", "la page en cours doit etre memorisee");
+  });
+
+  test("la reprise repart de la page memorisee, pas du debut", async () => {
+    const { ctx, transport } = createTestContext({
+      sourceId: "bj.sgg",
+      config: { category: "lois", baseUrl: BASE },
+      allowedHosts: ["sgg.gouv.bj"],
+      fixtures: {
+        [`${BASE}/documentheque/lois/`]: { body: page1 },
+        [`${BASE}/documentheque/lois/2/`]: { body: page2 },
+        [`${BASE}/documentheque/lois/3/`]: { body: "<html><body>1 - 0 sur 0</body></html>" },
+      },
+    });
+    const plugin = new SggBeninPlugin();
+    await plugin.init(ctx);
+    await plugin.restore({ version: 1, cursor: "page:1" });
+
+    await collect(
+      plugin.discover({
+        mode: "full",
+        budget: { maxRequests: 100, maxBytes: 10_000_000, maxDurationMs: 60_000 },
+      }),
+    );
+
+    // Le defaut corrige : sans reprise, chaque nuit refaisait la page 1 et la
+    // collecte ne depassait jamais ce qu'une nuit permet.
+    const fixtureTransport = transport as unknown as { callsTo(url: string): number };
+    assert.equal(fixtureTransport.callsTo(`${BASE}/documentheque/lois/`), 0);
+    assert.equal(fixtureTransport.callsTo(`${BASE}/documentheque/lois/2/`), 1);
+  });
+
+  test("un balayage mene a son terme ne laisse aucun curseur", async () => {
+    const { ctx } = createTestContext({
+      sourceId: "bj.sgg",
+      config: { category: "lois", baseUrl: BASE },
+      allowedHosts: ["sgg.gouv.bj"],
+      fixtures: {
+        [`${BASE}/documentheque/lois/`]: { body: page1 },
+        [`${BASE}/documentheque/lois/2/`]: { body: "<html><body>1 - 0 sur 0</body></html>" },
+      },
+    });
+    const plugin = new SggBeninPlugin();
+    await plugin.init(ctx);
+    await collect(
+      plugin.discover({
+        mode: "full",
+        budget: { maxRequests: 100, maxBytes: 10_000_000, maxDurationMs: 60_000 },
+      }),
+    );
+
+    // Sinon la collecte suivante repartirait du milieu de l'index et les
+    // nouveautes du debut ne seraient jamais revues.
+    assert.equal((await plugin.checkpoint()).cursor, undefined);
+  });
+});
+
 describe("stabilité des nativeId (Vol. III, 13.5)", () => {
   const FORBIDDEN = [
     { rule: /page[=_-]?\d+/i, label: "numéro de page" },

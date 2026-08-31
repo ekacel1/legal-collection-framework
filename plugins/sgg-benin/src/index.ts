@@ -245,15 +245,24 @@ export default class SggBeninPlugin
     };
   }
 
+  /**
+   * L'etat de reprise porte deux choses distinctes :
+   *   - `highWaterMark` : jusqu'ou la source avait publie, pour l'incremental ;
+   *   - `cursor` : ou le balayage complet s'est arrete, s'il a ete tronque.
+   * Le second est ce qui permet de collecter 32 000 decrets en plusieurs nuits.
+   */
   async checkpoint(): Promise<CheckpointState> {
+    const cursor = this.paginationCursor;
     return {
       version: 1,
       ...(this.#highWaterMark === undefined ? {} : { highWaterMark: this.#highWaterMark }),
+      ...(cursor === undefined ? {} : { cursor }),
     };
   }
 
   async restore(state: CheckpointState): Promise<void> {
     this.#highWaterMark = state.highWaterMark;
+    this.restorePagination(state.cursor);
   }
 
   /** Diagnostic sans collecte : la source répond-elle, et dans la forme attendue ? */

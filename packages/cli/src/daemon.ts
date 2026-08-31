@@ -17,6 +17,8 @@ import {
   defaultIsAlive,
   describeUnknown,
   isInBlackout,
+  nextRunAfter,
+  parseCron,
   toIsoTimestamp,
   validateCron,
   validateWindows,
@@ -67,9 +69,37 @@ export function preflight(app: LcfApp): string[] {
 
   for (const entry of enabled) {
     const cron = entry.cron ?? app.config.defaultCron;
-    if (cron !== undefined) {
-      const problem = validateCron(cron);
-      if (problem !== null) problems.push(`${entry.sourceId} : ${problem}`);
+    if (cron === undefined) continue;
+
+    const problem = validateCron(cron);
+    if (problem !== null) {
+      problems.push(`${entry.sourceId} : ${problem}`);
+      continue;
+    }
+
+    // Le cron est evalue en heure LOCALE du serveur, les fenetres d'exclusion
+    // dans leur propre fuseau. Une source dont toutes les echeances tombent
+    // dans une fenetre ne collecterait jamais — et le silence ne se remarque
+    // qu'au bout de plusieurs jours. Autant le dire au demarrage.
+    const windows = app.config.blackoutWindows ?? [];
+    if (windows.length === 0) continue;
+
+    const parsed = parseCron(cron);
+    let from = app.clock.now();
+    let bloquees = 0;
+    for (let index = 0; index < 5; index++) {
+      const next = nextRunAfter(parsed, from);
+      if (next === null) break;
+      if (isInBlackout(windows, next)) bloquees++;
+      from = next;
+    }
+    if (bloquees === 5) {
+      problems.push(
+        `${entry.sourceId} : la cadence "${cron}" tombe systematiquement dans une ` +
+          "fenetre d'exclusion — cette source ne collecterait jamais. " +
+          `Heure locale du serveur : ${app.clock.now().toString()}. ` +
+          "Reglez le serveur en UTC, ou decalez le cron.",
+      );
     }
   }
   return problems;
