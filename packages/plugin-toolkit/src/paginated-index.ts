@@ -21,6 +21,8 @@ export interface PaginatedIndexOptions {
   readonly maxPages?: number;
   /** Pages vides consecutives tolerees avant arret. */
   readonly emptyStreakLimit?: number;
+  /** Pages consecutives SANS NOUVEAUTE tolerees avant arret (defaut 25). */
+  readonly staleStreakLimit?: number;
 }
 
 export abstract class PaginatedIndexStrategy implements SourcePlugin {
@@ -30,6 +32,7 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
   protected ctx!: PluginContext;
   readonly #maxPages: number;
   readonly #emptyStreakLimit: number;
+  readonly #staleStreakLimit: number;
   /**
    * Page a laquelle reprendre, quand le balayage precedent a ete tronque.
    *
@@ -50,6 +53,7 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
   constructor(options: PaginatedIndexOptions = {}) {
     this.#maxPages = options.maxPages ?? 1000;
     this.#emptyStreakLimit = options.emptyStreakLimit ?? 2;
+    this.#staleStreakLimit = options.staleStreakLimit ?? 25;
   }
 
   /** URL de la page `page`, indexee a partir de zero. */
@@ -107,6 +111,7 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
     const seen = new Set<string>();
     let page = this.#resumeFromPage;
     let emptyStreak = 0;
+    let staleStreak = 0;
     let previousSignature = "";
     let emitted = 0;
 
@@ -148,7 +153,24 @@ export abstract class PaginatedIndexStrategy implements SourcePlugin {
         if (scope.maxDocuments !== undefined && emitted >= scope.maxDocuments) return;
       }
 
-      if (novel === 0 && refs.length > 0) return this.#sweepCompleted();
+      // Une page sans nouveaute n'arrete PAS le parcours a elle seule.
+      //
+      // Ce garde-fou visait une pagination cassee qui renverrait toujours la
+      // meme page. Mais un index reel n'est pas strictement ordonne : sur le
+      // SGG, la page 306 finit sur le decret 2013-275 et la 307 reprend au
+      // 2013-294. Une page entierement deja vue survient donc naturellement,
+      // et arreter la coupait le balayage a 19 % de l'index — 6 112 documents
+      // sur 32 380 annonces, sans qu'aucun message ne le signale.
+      //
+      // La garde anti-boucle demeure : deux pages IDENTIQUES d'affilee
+      // arretent toujours le parcours, et c'est elle qui protege du vrai
+      // danger — une pagination qui ne pagine plus.
+      if (novel === 0 && refs.length > 0) {
+        staleStreak++;
+        if (staleStreak >= this.#staleStreakLimit) return this.#sweepCompleted();
+      } else {
+        staleStreak = 0;
+      }
       if (!this.hasNextPage(html, page)) return this.#sweepCompleted();
       page++;
     }
